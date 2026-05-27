@@ -3,7 +3,7 @@ name: Daikichi-Monitor-Cron
 on:
   schedule:
     # 5分おきに自動起動
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch: # 手動で動かすボタン
 
 jobs:
