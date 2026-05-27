@@ -26,7 +26,8 @@ def send_slack_notification(message):
     except: pass
 
 def main():
-    url = "https://www.kaitori-daikichi.jp/store-search/"
+    # 🎯 最新の新着・店舗一覧ページを見に行きます
+    url = "https://www.kaitori-daikichi.jp/store/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Monitor/1.0"}
     
     try:
@@ -39,24 +40,33 @@ def main():
     state = load_state()
     new_state = state.copy()
     
-    # 大吉の公式サイトから新着オープンの店舗リストを抜き出します
-    stores = soup.find_all("div", class_="p-store-search__new-item")
+    # 🎯 2026年現在の大吉の店舗リンク・カードをすべて抽出します
+    links = soup.find_all("a")
+    found_any = False
     
-    for store in stores:
-        title_tag = store.find("p", class_="p-store-search__new-title")
-        link_tag = store.find("a")
-        
-        if title_tag and link_tag:
-            store_name = title_tag.text.strip()
-            store_url = link_tag["href"]
-            
-            # すでに通知済みの店舗ならスルーします
+    for link in links:
+        href = link.get("href", "")
+        # /store/xxxxx という店舗個別URLだけをターゲットにします
+        if "/store/" in href and href != "https://www.kaitori-daikichi.jp/store/" and href != "/store/":
+            # フルURLに整形
+            if href.startswith("/"):
+                store_url = f"https://www.kaitori-daikichi.jp{href}"
+            else:
+                store_url = href
+                
+            # テキスト（店舗名）を取得
+            store_name = link.text.strip()
+            if not store_name or "一覧" in store_name or "検索" in store_name:
+                continue
+                
+            # すでに通知済みの店舗ならスルー
             if store_url in state:
                 continue
                 
-            # 🎉 新着店舗を見つけたら、銀座屋風のかっこいいレイアウトで通知！
+            found_any = True
+            # 🎉 銀座屋風のかっこいいレイアウトで通知！
             msg = (
-                f"✨🈚 **買取大吉 新着オープン情報** 🈚✨\n"
+                f"✨🈚 **買取大吉 新着店舗情報** 🈚✨\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🏬 **店舗名**: {store_name}\n"
                 f"🔗 **URL**: {store_url}\n"
@@ -65,7 +75,9 @@ def main():
             send_slack_notification(msg)
             new_state.append(store_url)
             
+    # テスト用に、もし1件でも新しいものがあれば保存
     save_state(new_state)
+    print(f"処理完了。新着通知対象あり: {found_any}")
 
 if __name__ == "__main__":
     main()
