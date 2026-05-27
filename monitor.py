@@ -26,8 +26,8 @@ def send_slack_notification(message):
     except: pass
 
 def main():
-    # 🎯 最新の店舗一覧ページを見に行きます
-    url = "https://www.kaitori-daikichi.jp/store/"
+    # 🎯 ご指定いただいた、本当の新着オープン公式ページを見に行きます
+    url = "https://www.kaitori-daikichi.jp/open/category/new/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Monitor/1.0"}
     
     try:
@@ -40,40 +40,47 @@ def main():
     state = load_state()
     new_state = state.copy()
     
-    # 🎯 店舗リンクをすべて抽出します
-    links = soup.find_all("a")
-    found_any = False
+    # 大吉の新しいお知らせ記事（カード）をすべてループ処理します
+    articles = soup.find_all("article")
     
-    for link in links:
-        href = link.get("href", "")
-        if "/store/" in href and href != "https://www.kaitori-daikichi.jp/store/" and href != "/store/":
-            if href.startswith("/"):
-                store_url = f"https://www.kaitori-daikichi.jp{href}"
-            else:
-                store_url = href
-                
-            store_name = link.text.strip()
-            if not store_name or "一覧" in store_name or "検索" in store_name:
+    for article in articles:
+        # 記事のタイトル（例：【愛知県名古屋市】 5月20日 『買取大吉 大曽根店』 OPEN!!）
+        title_tag = article.find(["h2", "h3", "p"], class_=lambda x: x and 'title' in x.lower())
+        if not title_tag:
+            title_tag = article.find(["h2", "h3"])
+            
+        # 記事のリンク（例：https://www.kaitori-daikichi.jp/open/open-5124360）
+        link_tag = article.find("a")
+        
+        if title_tag and link_tag:
+            raw_title = title_tag.text.strip()
+            store_url = link_tag["href"]
+            
+            # 余計な文字や改行を綺麗にお掃除
+            clean_title = " ".join(raw_title.split())
+            
+            # 必要な個別ページURLだけを対象にする
+            if "/open/" not in store_url or "category" in store_url:
                 continue
                 
-            # すでに通知済みの店舗ならスルー
+            if store_url.startswith("/"):
+                store_url = f"https://www.kaitori-daikichi.jp{store_url}"
+                
+            # すでに通知済みのURLなら重複なのでスルー
             if store_url in state:
                 continue
                 
-            found_any = True
-            # 🎉 銀座屋風のかっこいいレイアウトで通知！
+            # 🎯 スクショと寸分違わぬ「完全再現」の銀座屋風レイアウト
             msg = (
-                f"✨🈚 **買取大吉 新着店舗情報** 🈚✨\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🏬 **店舗名**: {store_name}\n"
-                f"🔗 **URL**: {store_url}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━"
+                f"💎 買取大吉 [公式オープン] ✨新店オープン検知✨\n"
+                f" 【詳細】：{clean_title}\n"
+                f" 🔗 公式告知ページ: {store_url}\n"
+                f"----------------------------------------"
             )
             send_slack_notification(msg)
             new_state.append(store_url)
             
     save_state(new_state)
-    print(f"処理完了。新着通知対象あり: {found_any}")
 
 if __name__ == "__main__":
     main()
