@@ -13,12 +13,15 @@ if not path.exists():
 source = path.read_text(encoding="utf-8")
 shutil.copy2(path, backup)
 
-if "# DETAILS_UPDATE_V1" in source:
-    print("Already updated")
-    sys.exit(0)
-
-if "import re" not in source:
+has_re_import = any(line.strip() == "import re" for line in source.splitlines())
+if not has_re_import:
     source = source.replace("import os\n", "import os\nimport re\n", 1)
+
+if "# DETAILS_UPDATE_V1" in source:
+    path.write_text(source, encoding="utf-8")
+    py_compile.compile(str(path), doraise=True)
+    print("UPDATE_OK_V2")
+    sys.exit(0)
 
 details_code = r'''
 # DETAILS_UPDATE_V1
